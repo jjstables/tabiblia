@@ -28,7 +28,7 @@ for comment in subreddit.stream.comments():
     if match and (comment.created_utc > float(last_bot_comment)):
         print("Found a comment newer than our last bot response.")
         try:
-            apiquery = re.sub(r"[^0-9a-zA-Z :]","",match.group(0))
+            apiquery = re.sub(r"[^0-9a-zA-Z :-]","",match.group(0))
             print("Sending `" + apiquery + "` to the appropriate Bible API.")
             response = esv.get_esv_text(apiquery)
             comment_successful = comment.reply(response)
