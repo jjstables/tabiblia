@@ -1,29 +1,42 @@
-import sys
-import requests
+import praw
 import json
+import re
+import esv
 
 file = open('shh.json')
 variables = json.loads(file.read())
 
-API_KEY = variables["esvkey"]
-API_URL = 'https://api.esv.org/v3/passage/text/'
+reddit = praw.Reddit(
+    client_id=variables["redditid"],
+    client_secret=variables["redditsecret"],
+    password=variables["password"],
+    user_agent=variables["app"],
+    username=variables["username"]
+    )
 
-def get_esv_text(passage):
-    params = {
-        'q': passage,
-        'include-headings': False,
-        'include-footnotes': False,
-        'include-verse-numbers': True,
-        'include-short-copyright': True,
-        'include-passage-references': True
-    }
+subreddit = reddit.subreddit('DrKC9N')
 
-    headers = {
-        'Authorization': 'Token %s' % API_KEY
-    }
+try:
+    with open("last_comment_success.txt","r") as sourcefile:
+        last_bot_comment = sourcefile.read()
+except:
+    print("Couldn't read from last_comment_success.txt")
 
-    response = requests.get(API_URL, params=params, headers=headers)
-
-    passages = response.json()['passages']
-
-    return passages[0].strip() if passages else 'Error: Passage not found'
+for comment in subreddit.stream.comments():
+    text = comment.body
+    match = re.search(r"\[.{2,25}:.{1,12}\]",text)
+    if match and (comment.created_utc > float(last_bot_comment)):
+        print("Found a comment newer than our last bot response.")
+        try:
+            apiquery = re.sub(r"[^0-9a-zA-Z :-]","",match.group(0))
+            print("Sending `" + apiquery + "` to the appropriate Bible API.")
+            response = esv.get_esv_text(apiquery)
+            comment_successful = comment.reply(response)
+            if comment_successful:
+                print(comment_successful.created_utc)
+                last_bot_comment = str(comment_successful.created_utc)
+                with open("last_comment_success.txt","w") as bump:
+                    print("file opened successfully")
+                    bump.write(last_bot_comment)
+        except:
+            print("whoops")
